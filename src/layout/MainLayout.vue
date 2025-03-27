@@ -10,18 +10,34 @@
         <h2 class="title">AI Platform</h2>
       </div>
       <div class="header-right">
+        <el-dropdown @command="handleLanguageChange" trigger="click">
+          <el-button link>
+            {{ currentLanguage === 'zh' ? '中文' : 'English' }}
+            <el-icon class="el-icon--right">
+              <arrow-down />
+            </el-icon>
+          </el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="zh">中文</el-dropdown-item>
+              <el-dropdown-item command="en">English</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
         <template v-if="!isLoggedIn">
-          <el-button link type="primary" @click="handleLogin">Log In</el-button>
+          <el-button link @click="handleLogin">{{ $t('nav.login') }}</el-button>
         </template>
         <template v-else>
-          <el-dropdown @command="handleCommand" trigger="click">
-            <span class="user-info">
+          <el-dropdown @command="handleCommand">
+            <el-button link>
               {{ username }}
-              <el-icon><ArrowDown /></el-icon>
-            </span>
+              <el-icon class="el-icon--right">
+                <arrow-down />
+              </el-icon>
+            </el-button>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item command="logout">Log Out</el-dropdown-item>
+                <el-dropdown-item command="logout">{{ $t('nav.logout') }}</el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
@@ -30,7 +46,7 @@
     </el-header>
     
     <el-container class="main-container">
-      <el-aside :width="isCollapse ? '64px' : '200px'" class="aside">
+      <el-aside :width="isCollapse ? '64px' : '210px'" class="aside" style="position: relative;">
         <el-menu
           :default-active="activeMenu"
           class="el-menu-vertical"
@@ -44,21 +60,26 @@
           <el-sub-menu index="/dataset">
             <template #title>
               <el-icon><Collection /></el-icon>
-              <span>Datasets</span>
+              <span>{{ $t('menu.datasets.title') }}</span>
             </template>
-            <el-menu-item index="/dataset/classification">分类数据集</el-menu-item>
-            <el-menu-item index="/dataset/detection">检测数据集</el-menu-item>
-            <el-menu-item index="/dataset/segmentation">分割数据集</el-menu-item>
+            <el-menu-item index="/dataset/classification">{{ $t('menu.datasets.classification') }}</el-menu-item>
+            <el-menu-item index="/dataset/detection">{{ $t('menu.datasets.detection') }}</el-menu-item>
+            <el-menu-item index="/dataset/segmentation">{{ $t('menu.datasets.segmentation') }}</el-menu-item>
           </el-sub-menu>
           <el-sub-menu index="/experiments">
             <template #title>
               <el-icon><Operation /></el-icon>
-              <span>Experiments</span>
+              <span>{{ $t('menu.experiments.title') }}</span>
             </template>
-            <el-menu-item index="/experiments/running">进行中</el-menu-item>
-            <el-menu-item index="/experiments/completed">已完成</el-menu-item>
+            <el-menu-item index="/experiments/running">{{ $t('menu.experiments.running') }}</el-menu-item>
+            <el-menu-item index="/experiments/completed">{{ $t('menu.experiments.completed') }}</el-menu-item>
           </el-sub-menu>
         </el-menu>
+        <div 
+          class="resize-handle"
+          v-if="!isCollapse"
+          @mousedown="startResize"
+        ></div>
       </el-aside>
       
       <el-main class="main-content">
@@ -69,10 +90,11 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { Monitor, Collection, Operation, Expand, Fold, ArrowDown } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { login, logout } from '../api/auth'
 
 const router = useRouter()
@@ -81,11 +103,19 @@ const isLoggedIn = ref(false)
 const username = ref('')
 const dropdownVisible = ref(false)
 const route = useRoute()
+const { t, locale } = useI18n()
+const currentLanguage = computed(() => locale.value)
 
 const activeMenu = computed(() => route.path)
 
+const isDragging = ref(false)
+
 const toggleCollapse = () => {
   isCollapse.value = !isCollapse.value
+  const aside = document.querySelector('.aside')
+  if (aside) {
+    aside.style.width = isCollapse.value ? '64px' : '210px'
+  }
 }
 
 const handleLogin = async () => {
@@ -115,6 +145,48 @@ const handleCommand = async (command) => {
     await handleLogout()
   }
 }
+
+const handleLanguageChange = (lang) => {
+  locale.value = lang
+  localStorage.setItem('language', lang)
+}
+
+const startResize = (e) => {
+  const aside = e.target.parentElement
+  const startWidth = aside.offsetWidth
+  const startX = e.clientX
+  isDragging.value = true
+  e.target.classList.add('dragging')
+  
+  const handleMouseMove = (e) => {
+    e.preventDefault()
+    requestAnimationFrame(() => {
+      const newWidth = Math.round((startWidth + (e.clientX - startX)) / 10) * 10
+      if (newWidth >= 210 && newWidth <= 400) {
+        aside.style.width = `${newWidth}px`
+      }
+    })
+  }
+
+  const handleMouseUp = () => {
+    isDragging.value = false
+    e.target.classList.remove('dragging')
+    document.removeEventListener('mousemove', handleMouseMove)
+    document.removeEventListener('mouseup', handleMouseUp)
+    document.body.style.cursor = ''
+  }
+
+  document.addEventListener('mousemove', handleMouseMove)
+  document.addEventListener('mouseup', handleMouseUp)
+  document.body.style.cursor = 'col-resize'
+}
+
+watch(route, () => {
+  const aside = document.querySelector('.aside')
+  if (aside && isCollapse.value) {
+    aside.style.width = '64px'
+  }
+})
 </script>
 
 <style scoped>
@@ -156,6 +228,7 @@ const handleCommand = async (command) => {
 .header-right {
   display: flex;
   align-items: center;
+  gap: 16px;
 }
 
 .main-container {
@@ -165,9 +238,11 @@ const handleCommand = async (command) => {
 
 .aside {
   background-color: #F5F6FF;
-  transition: width 0.3s;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
   border-right: 1px solid #E4E7ED;
+  position: relative;
+  user-select: none;
 }
 
 .user-info {
@@ -185,10 +260,66 @@ const handleCommand = async (command) => {
 
 .el-menu-vertical {
   border-right: none;
+  width: 100% !important;
 }
 
 .el-menu-vertical:not(.el-menu--collapse) {
-  width: 200px;
+  width: 100% !important;
+}
+
+:deep(.el-menu) {
+  width: 100% !important;
+}
+
+:deep(.el-menu-item),
+:deep(.el-sub-menu__title) {
+  padding: 0 40px 0 16px !important;
+  min-width: unset !important;
+  width: 100% !important;
+  position: relative;
+}
+
+:deep(.el-sub-menu__title) {
+  display: flex !important;
+  align-items: center !important;
+}
+
+:deep(.el-sub-menu__title .el-icon) {
+  margin-right: 8px !important;
+  flex-shrink: 0 !important;
+}
+
+:deep(.el-sub-menu__title span) {
+  flex: 1 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+:deep(.el-sub-menu__arrow) {
+  position: absolute !important;
+  right: 20px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  transform-origin: center center !important;
+  transition: transform 0.3s !important;
+  margin: 0 !important;
+  z-index: 1 !important;
+}
+
+:deep(.el-icon.el-sub-menu__icon-arrow) {
+  width: 12px !important;
+  height: 12px !important;
+}
+
+:deep(.el-sub-menu.is-opened > .el-sub-menu__title .el-sub-menu__arrow) {
+  transform: translateY(-50%) rotateZ(180deg) !important;
+}
+
+:deep(.el-sub-menu .el-menu-item) {
+  min-width: unset !important;
+  width: 100% !important;
+  padding: 0 20px 0 40px !important;
 }
 
 .main-content {
@@ -221,10 +352,27 @@ const handleCommand = async (command) => {
 }
 
 :deep(.el-button.is-link) {
-  font-size: 14px;
+  color: #606266;
 }
 
 :deep(.el-button.is-link:hover) {
-  color: #6574FF;
+  color: #409EFF;
+}
+
+.resize-handle {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  background-color: transparent;
+  transition: background-color 0.2s;
+  z-index: 100;
+}
+
+.resize-handle:hover,
+.resize-handle.dragging {
+  background-color: #409EFF;
 }
 </style> 

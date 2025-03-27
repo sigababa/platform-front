@@ -3,13 +3,13 @@
     <div class="dataset-layout">
       <!-- 左侧数据集列表 -->
       <div class="dataset-list">
-        <h2 class="section-title">分类数据集</h2>
+        <h2 class="section-title">{{ $t('dataset.title') }}</h2>
         
         <!-- 筛选条件 -->
         <div class="filter-section">
           <el-input
             v-model="filters.namePattern"
-            placeholder="输入数据集名称正则表达式"
+            :placeholder="$t('dataset.nameFilter')"
             clearable
             class="filter-input"
           >
@@ -20,7 +20,7 @@
           
           <el-input
             v-model="filters.pathPattern"
-            placeholder="输入路径正则表达式"
+            :placeholder="$t('dataset.pathFilter')"
             clearable
             class="filter-input"
           >
@@ -36,8 +36,16 @@
           @row-click="handleDatasetSelect"
           :highlight-current-row="true"
           height="calc(100vh - 280px)"
+          border
+          fit
         >
-          <el-table-column prop="name" label="名称" min-width="120" sortable>
+          <el-table-column 
+            prop="name" 
+            :label="$t('dataset.columns.name')" 
+            min-width="200"
+            :show-overflow-tooltip="true"
+            resizable
+          >
             <template #default="{ row }">
               <div class="dataset-name-cell">
                 <el-icon><Folder /></el-icon>
@@ -45,33 +53,43 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column prop="path" label="路径" min-width="150">
+          <el-table-column 
+            prop="path" 
+            :label="$t('dataset.columns.path')" 
+            min-width="180"
+            :show-overflow-tooltip="true"
+            resizable
+          >
             <template #default="{ row }">
               <span class="text-muted">/datasets/classification/{{ row.id }}</span>
             </template>
           </el-table-column>
           <el-table-column 
             prop="size" 
-            label="大小" 
-            width="100"
+            :label="$t('dataset.columns.size')" 
+            min-width="100"
             sortable
             :sort-method="sortBySize"
+            resizable
           >
             <template #default="{ row }">
               <span class="text-muted">{{ row.size }}</span>
             </template>
           </el-table-column>
         </el-table>
+        
+        <!-- 添加分割线 -->
+        <div class="resizer"></div>
       </div>
 
       <!-- 右侧数据集详情 -->
       <div class="dataset-detail" v-if="selectedDataset">
         <div class="detail-header">
-          <h2 class="detail-title">{{ selectedDataset.name }}</h2>
+          <h2 class="detail-title">{{ $t('dataset.details.title') }}</h2>
           <div class="detail-actions">
             <el-dropdown @command="handleSync">
               <el-button type="primary" :icon="RefreshRight">
-                Sync
+                {{ $t('dataset.actions.sync') }}
               </el-button>
               <template #dropdown>
                 <el-dropdown-menu>
@@ -88,48 +106,50 @@
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
-            <el-button type="danger" :icon="Delete" @click="handleDelete">Delete</el-button>
+            <el-button type="danger" :icon="Delete" @click="handleDelete">
+              {{ $t('dataset.actions.delete') }}
+            </el-button>
           </div>
         </div>
         
         <div class="detail-content">
           <div class="section">
-            <h4 class="section-title">基本信息</h4>
+            <h4 class="section-title">{{ $t('dataset.details.basicInfo') }}</h4>
             <div class="info-grid">
               <div class="info-item">
-                <span class="info-label">数据集大小</span>
+                <span class="info-label">{{ $t('dataset.details.labels.size') }}</span>
                 <span class="info-value">{{ selectedDataset.size }}</span>
               </div>
               <div class="info-item">
-                <span class="info-label">更新时间</span>
+                <span class="info-label">{{ $t('dataset.details.labels.updateTime') }}</span>
                 <span class="info-value">{{ selectedDataset.updatedAt }}</span>
               </div>
               <div class="info-item">
-                <span class="info-label">数据量</span>
+                <span class="info-label">{{ $t('dataset.details.labels.dataAmount') }}</span>
                 <span class="info-value">{{ selectedDataset.metadata }}</span>
               </div>
               <div class="info-item">
-                <span class="info-label">存储路径</span>
+                <span class="info-label">{{ $t('dataset.details.labels.storagePath') }}</span>
                 <span class="info-value text-muted">/datasets/classification/{{ selectedDataset.id }}</span>
               </div>
             </div>
           </div>
 
           <div class="section">
-            <h4 class="section-title">服务器状态</h4>
+            <h4 class="section-title">{{ $t('dataset.details.serverStatus') }}</h4>
             <div class="server-grid">
               <div v-for="server in selectedDataset.servers" :key="server.location" class="server-status-item">
                 <div class="status-info">
                   <div class="status-dot" :class="getStatusClass(server.status)"></div>
                   <span class="server-name">{{ server.location }}</span>
                 </div>
-                <span class="status-text">{{ getStatusText(server.status) }}</span>
+                <span class="status-text">{{ $t(`dataset.status.${server.status}`) }}</span>
               </div>
             </div>
           </div>
 
           <div class="section">
-            <h4 class="section-title">更新日志</h4>
+            <h4 class="section-title">{{ $t('dataset.details.updateLogs') }}</h4>
             <el-timeline>
               <el-timeline-item
                 v-for="log in updateLogs"
@@ -149,16 +169,19 @@
       
       <!-- 未选择数据集时的占位内容 -->
       <div class="dataset-detail empty-detail" v-else>
-        <el-empty description="请选择一个数据集查看详情" />
+        <el-empty :description="$t('dataset.emptyText')" />
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { Folder, RefreshRight, Delete, Search, FolderOpened } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 // 数据集状态枚举
 const DatasetStatus = {
@@ -178,17 +201,17 @@ const filters = ref({
 // 生成随机数据集
 const generateDatasets = (count) => {
   const datasets = []
-  const types = ['图像', '文本', '音频', '视频']
-  const tasks = ['分类', '检测', '分割', '识别']
+  const types = ['Image', 'Text', 'Audio', 'Video']
+  const tasks = ['Classification', 'Detection', 'Segmentation', 'Recognition']
   const sizes = ['1.2GB', '2.5GB', '3.8GB', '5.1GB', '8.3GB', '12.6GB', '15.9GB']
-  const metadata = ['5000张图片', '8000条文本', '10000个样本', '12000条记录']
+  const metadata = ['5000 images', '8000 texts', '10000 samples', '12000 records']
   
   for (let i = 1; i <= count; i++) {
     const type = types[Math.floor(Math.random() * types.length)]
     const task = tasks[Math.floor(Math.random() * tasks.length)]
     datasets.push({
       id: i,
-      name: `${type}${task}数据集${i}`,
+      name: `${type} ${task} Dataset ${i}`,
       updatedAt: `2024-${String(Math.floor(Math.random() * 12) + 1).padStart(2, '0')}-${String(Math.floor(Math.random() * 28) + 1).padStart(2, '0')}`,
       size: sizes[Math.floor(Math.random() * sizes.length)],
       metadata: metadata[Math.floor(Math.random() * metadata.length)],
@@ -244,18 +267,18 @@ const sortBySize = (a, b) => {
 const updateLogs = ref([
   {
     date: '2024-01-20 14:30',
-    title: '数据集更新',
-    description: '添加了1000张新的训练图片，优化了标注质量'
+    title: 'Dataset Update',
+    description: 'Added 1000 new training images and optimized annotation quality'
   },
   {
     date: '2024-01-15 09:45',
-    title: '标注规范更新',
-    description: '更新了图像标注规范，提高了标注一致性'
+    title: 'Annotation Guidelines Update',
+    description: 'Updated image annotation guidelines to improve consistency'
   },
   {
     date: '2024-01-10 16:20',
-    title: '初始版本',
-    description: '创建数据集，上传了基础的训练数据'
+    title: 'Initial Version',
+    description: 'Created dataset and uploaded basic training data'
   }
 ])
 
@@ -264,22 +287,22 @@ const handleDatasetSelect = (row) => {
 }
 
 const handleSync = (location) => {
-  ElMessage.success(`正在同步到 ${location}`)
+  ElMessage.success(`Syncing to ${location}`)
   // TODO: 实现同步逻辑
 }
 
 const handleDelete = () => {
   ElMessageBox.confirm(
-    '确定要删除这个数据集吗？此操作不可逆',
-    '警告',
+    t('dataset.actions.deleteConfirm'),
+    t('dataset.actions.deleteWarning'),
     {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
+      confirmButtonText: 'Confirm',
+      cancelButtonText: 'Cancel',
       type: 'warning',
     }
   ).then(() => {
     // TODO: 实现删除逻辑
-    ElMessage.success('数据集已删除')
+    ElMessage.success('Dataset deleted successfully')
     selectedDataset.value = null
   }).catch(() => {
     // 取消删除
@@ -309,7 +332,76 @@ const getStatusText = (status) => {
       return '不存在'
   }
 }
+
+// 添加宽度调整功能
+const startListResize = (e) => {
+  if (!e.target.classList.contains('resizer')) return;
+  
+  const list = document.querySelector('.dataset-list');
+  const detail = document.querySelector('.dataset-detail');
+  const container = document.querySelector('.dataset-layout');
+  const resizer = e.target;
+  
+  const startWidth = list.offsetWidth;
+  const startX = e.clientX;
+  
+  // 添加禁止选中类
+  document.body.classList.add('resize-active');
+  resizer.classList.add('dragging');
+  
+  const handleMouseMove = (e) => {
+    e.preventDefault();
+    requestAnimationFrame(() => {
+      const newWidth = startWidth + (e.clientX - startX);
+      const containerWidth = container.offsetWidth;
+      
+      if (newWidth >= 400 && newWidth <= (containerWidth - 400)) {
+        list.style.width = `${newWidth}px`;
+        list.style.flex = `0 0 ${newWidth}px`;
+      }
+    });
+  };
+
+  const handleMouseUp = () => {
+    // 移除禁止选中类
+    document.body.classList.remove('resize-active');
+    resizer.classList.remove('dragging');
+    document.removeEventListener('mousemove', handleMouseMove);
+    document.removeEventListener('mouseup', handleMouseUp);
+    document.body.style.cursor = '';
+  };
+
+  document.addEventListener('mousemove', handleMouseMove);
+  document.addEventListener('mouseup', handleMouseUp);
+  document.body.style.cursor = 'col-resize';
+};
+
+// 修改模板中的事件监听
+onMounted(() => {
+  const container = document.querySelector('.dataset-layout');
+  if (container) {
+    container.addEventListener('mousedown', startListResize);
+  }
+});
+
+onUnmounted(() => {
+  const container = document.querySelector('.dataset-layout');
+  if (container) {
+    container.removeEventListener('mousedown', startListResize);
+  }
+});
 </script>
+
+<style>
+/* 全局样式，防止文本选中 */
+.resize-active {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  cursor: col-resize !important;
+}
+</style>
 
 <style scoped>
 .dataset-container {
@@ -319,24 +411,28 @@ const getStatusText = (status) => {
 
 .dataset-layout {
   display: flex;
-  gap: 20px;
   height: calc(100vh - 120px);
   background-color: #fff;
   border-radius: 8px;
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
+  position: relative;
 }
 
 .dataset-list {
   flex: 0 0 50%;
+  min-width: 400px;
+  max-width: 800px;
   padding: 20px;
-  border-right: 1px solid #e4e7ed;
   overflow: auto;
+  position: relative;
 }
 
 .dataset-detail {
   flex: 1;
+  min-width: 400px;
   padding: 20px;
   overflow: auto;
+  position: relative;
 }
 
 .empty-detail {
@@ -514,6 +610,16 @@ const getStatusText = (status) => {
 :deep(.el-table) {
   --el-table-border-color: #e4e7ed;
   --el-table-header-bg-color: #F5F7FA;
+  --el-table-row-hover-bg-color: #F5F7FA;
+}
+
+:deep(.el-table__header) {
+  th {
+    background-color: var(--el-table-header-bg-color);
+    border-bottom: 1px solid var(--el-table-border-color);
+    font-weight: 500;
+    color: #606266;
+  }
 }
 
 :deep(.el-table__header-wrapper) {
@@ -524,7 +630,35 @@ const getStatusText = (status) => {
   cursor: pointer;
 }
 
-:deep(.el-table__row:hover) {
-  background-color: #F5F7FA !important;
+:deep(.el-table__cell) {
+  .cell {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+:deep(.el-table__column-resize-proxy) {
+  background-color: #409EFF;
+}
+
+/* 添加调整手柄样式 */
+.resizer {
+  width: 6px;
+  cursor: col-resize;
+  background-color: transparent;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: -3px;
+  transition: background-color 0.2s;
+  z-index: 10;
+  user-select: none;
+  touch-action: none;
+}
+
+.resizer:hover,
+.resizer.dragging {
+  background-color: #409EFF;
 }
 </style> 
